@@ -1,0 +1,42 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+
+Vagrant.configure("2") do |config|
+  config.vm.box = "bento/ubuntu-21.04"
+
+  config.vm.define "master" do |host|
+    host.vm.hostname = "master"
+    host.vm.network "private_network", ip: "192.168.33.10"
+    host.vm.provision "shell", inline: <<-SHELL
+      # Initialize Kubernetes
+      sudo swapoff -a
+      sudo sed -i 's/^\/swap.img/#\/swap.img/' /etc/fstab
+
+      sudo kubeadm init --kubernetes-version=1.18.2 --pod-network-cidr=10.244.0.0/16 --apiserver-advertise-address 192.168.33.10 | tee /tmp/kubeadm-init.log
+    SHELL
+  end
+
+  config.vm.define "child" do |host|
+    host.vm.hostname = "child"
+    host.vm.network "private_network", ip: "192.168.33.11"
+  end
+
+  config.vm.provision "shell", inline: <<-SHELL
+      # Install Kubernetes
+      # https://kubernetes.io/docs/tasks/tools/install-kubectl-linux/#install-using-native-package-management
+      sudo apt-get update && sudo apt-get install -y apt-transport-https gnupg2
+      curl -s https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key add -
+      echo "deb https://apt.kubernetes.io/ kubernetes-xenial main" | sudo tee -a /etc/apt/sources.list.d/kubernetes.list
+      sudo apt-get update
+      sudo apt-get install -y kubelet=1.18.2-00 kubeadm=1.18.2-00 kubectl=1.18.2-00 docker.io
+
+      sudo apt-mark hold kubelet kubeadm kubectl docker.io
+
+      echo "net.bridge.bridge-nf-call-ip6tables = 1" | sudo tee -a /etc/sysctl.d/k8s.conf
+      echo "net.bridge.bridge-nf-call-iptables = 1" | sudo tee -a /etc/sysctl.d/k8s.conf
+      echo "net.ipv4.ip_forward = 1" | sudo tee -a /etc/sysctl.d/k8s.conf
+
+      sudo sysctl --system
+    SHELL
+
+end
