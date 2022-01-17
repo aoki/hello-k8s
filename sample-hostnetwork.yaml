@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: sample-hostnetwork
+spec:
+  hostNetwork: true
+  containers:
+    - name: nginx-contaienr
+      image: nginx:1.16
